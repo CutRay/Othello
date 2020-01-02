@@ -33,6 +33,24 @@ struct othello{// オセロ用構造体
 board[0][4] = WHITE とすれば良い．
 ******/
 
+void saveBoard(int pos, struct othello *o) {
+  int ix, iy;
+  for (ix = 0; ix < o->n; ix++) {
+    for (iy = 0; iy < o->n; iy++) {
+      o->board_log[pos][ix][iy] = o->board[ix][iy];
+    }
+  }
+}
+
+void restoreBoard(int pos, struct othello *o) {
+  int ix, iy;
+  pos = pos < 0 ? 0 : pos;
+  for (ix = 0; ix < o->n; ix++) {
+    for (iy = 0; iy < o->n; iy++) {
+      o->board[ix][iy] = o->board_log[pos][ix][iy];
+    }
+  }
+}
 void countStone(struct othello *o) {
   int ix = 0, iy = 0;
   int black = 0, white = 0;
@@ -159,11 +177,11 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
     }
   }
 
-  int endX = -1, endY = -1;
   for (ix = 0; ix < o->n; ix++) {
     for (iy = 0; iy < o->n; iy++) {
       for (i = 0; i < 8; i++) {
         if (o->board[ix][iy] == -1) {
+          int endX = -1, endY = -1;
           if (checkPos(color, i, ix, iy, &endX, &endY, o, 0)) {
             hasUserPutPlace = true;
             puttablePos[ix][iy] = true;
@@ -183,25 +201,30 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
     if (o->score[1] < o->score[0]) printf("Winner is Black!!\n");
     return;
   }
-
   if (!hasUserPutPlace) {
     printf("You can not put anywhere.\nPass\n");
     return;
   }
 
-  if (color == WHITE) {
+  if (color == !o->player_color) {
     algo_4619023(color, puttablePos, o);
     for (i = 0; i < o->n; i++) {
       free(puttablePos[i]);
     }
     free(puttablePos);
     countStone(o);
+    saveBoard(*step + 1, o);
   }
 
-  if (color == BLACK) {
-    printf("Input cell (x y)\n");
+  if (color == o->player_color) {
+    printf("Input cell (x y)\nIf you want to back,Input (0 m).\n");
     scanf("%d %d", &x, &y);
-
+    if (x == 0) {
+      restoreBoard(*step - y, o);
+      *step -= (y + 1);
+      *step = *step < -1 ? -1 : *step;
+      return;
+    }
     /* 配列番号が0番から始まるため． */
     x--;
     y--;
@@ -211,29 +234,29 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
       *step -= 1;
       return;
     }
-
     if (o->board[x][y] != -1) {
       printf("There has already been stone.\nPlease input again.\n");
       *step -= 1;
       return;
     }
 
-    endX = -1, endY = -1;
     bool IsPuttable = false;
     for (i = 0; i < 8; i++) {
+      int endX = -1, endY = -1;
       if (checkPos(color, i, x, y, &endX, &endY, o, 0)) {
         paintStone(color, x, y, endX, endY, o->board);
         IsPuttable = true;
       }
     }
-    if (IsPuttable)
+    if (IsPuttable) {
       o->board[x][y] = color; /* 選んだマスに石を置く */
-    else {
+      countStone(o);
+      saveBoard(*step + 1, o);
+    } else {
       printf("You can not put there.\nPlease input again.\n");
       *step -= 1;
     }
   }
-  countStone(o);
 }
 
 /* 基本的に main 関数の中をいじる必要はありません．
@@ -253,20 +276,32 @@ int main(int argc, char **argv) {
     }
   }
 
-  int i;
+  int i, j;
   struct view view =
                   {
                       512,
                       512,
                   },
               *v = &view; /* おまじない (ウィンドウ) */
-  struct othello othello_instance = {n, {2, 2}, {0, 0}, NULL},
+  srand((unsigned int)time(NULL));
+  int playerColor = rand() % 2;
+  if (playerColor == BLACK) printf("You are black.\n");
+  if (playerColor == WHITE) printf("You are white.\n");
+  struct othello othello_instance = {n,      playerColor, {2, 2},
+                                     {0, 0}, NULL,        NULL},
                  *o = &othello_instance; /* 8はボードの列(行)数．*/
 
   /* ボード作成(2次元配列の確保) */
   o->board = (int **)malloc(sizeof(int *) * o->n);
   for (i = 0; i < o->n; i++) {
     o->board[i] = (int *)malloc(sizeof(int) * o->n);
+  }
+
+  o->board_log = (int ***)malloc(sizeof(int **) * (o->n * o->n));
+  for (i = 0; i < o->n * o->n; i++) {
+    o->board_log[i] = (int **)malloc(sizeof(int *) * o->n);
+    for (j = 0; j < o->n; j++)
+      o->board_log[i][j] = (int *)malloc(sizeof(int) * o->n);
   }
 
   view_init(v);  // おまじない (Xウィンドウ)
@@ -278,6 +313,14 @@ int main(int argc, char **argv) {
     free(o->board[i]);
   }
   free(o->board);
+
+  for (i = 0; i < o->n * o->n; i++) {
+    for (j = 0; j < o->n; j++) {
+      free(o->board_log[i][j]);
+    }
+    free(o->board_log[i]);
+  }
+  free(o->board_log);
 
   return 0;
 }
