@@ -73,45 +73,14 @@ void paintStone(int color, int startX, int startY, int endX, int endY,
   paintStone(color, startX + dx, startY + dy, endX, endY, board);
 }
 
-bool checkPos(int color, int vector, int startX, int startY, int *endX,
-              int *endY, struct othello *o, int count) {
-  int dx = 0, dy = 0;
-  switch (vector) {
-    case 0:
-      dx = -1, dy = 0;
-      break;
-    case 1:
-      dx = -1, dy = 1;
-      break;
-    case 2:
-      dx = 0, dy = 1;
-      break;
-    case 3:
-      dx = 1, dy = 1;
-      break;
-    case 4:
-      dx = 1, dy = 0;
-      break;
-    case 5:
-      dx = 1, dy = -1;
-      break;
-    case 6:
-      dx = 0, dy = -1;
-      break;
-    case 7:
-      dx = -1, dy = -1;
-      break;
-    default:
-      printf("vector error.\n");
-      return false;
-      break;
-  }
-  int x = startX + dx;
-  int y = startY + dy;
+bool checkPos(int color, int startX, int startY, int *endX, int *endY,
+              int vector[2], struct othello *o, int count) {
+  int x = startX + vector[0];
+  int y = startY + vector[1];
   if (x < 0 || y < 0 || x >= o->n || y >= o->n) return false;
   if (o->board[x][y] == -1) return false;
   if (o->board[x][y] == !color) {
-    if (!checkPos(color, vector, x, y, endX, endY, o, count + 1)) return false;
+    if (!checkPos(color, x, y, endX, endY, vector, o, count + 1)) return false;
   }
   if (o->board[x][y] == color) {
     if (count == 0) return false;
@@ -135,14 +104,19 @@ void algo_4619023(int color, bool **puttablePos, struct othello *o) {
     for (iy = 0; iy < o->n; iy++) {
       if (puttablePos[ix][iy]) {
         if (posCount == count) {
-          int i = 0;
-          for (i = 0; i < 8; i++) {
-            int endX = -1, endY = -1;
-            if (checkPos(color, i, ix, iy, &endX, &endY, o, 0)) {
-              paintStone(color, ix, iy, endX, endY, o->board);
+          int i;
+          for (i = -1; i <= 1; i++) {
+            int j;
+            for (j = -1; j <= 1; j++) {
+              if (i == 0 && j == 0) continue;
+              int endX = -1, endY = -1;
+              int vector[2] = {i, j};
+              if (checkPos(color, ix, iy, &endX, &endY, vector, o, 0)) {
+                paintStone(color, ix, iy, endX, endY, o->board);
+              }
             }
+            o->board[ix][iy] = color;
           }
-          o->board[ix][iy] = color;
         }
         count += 1;
       }
@@ -167,7 +141,7 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
   }
 
   bool hasUserPutPlace = false, hasEnemyPutPlace = false;
-  int ix = 0, iy = 0, i = 0, j = 0;
+  int ix = 0, iy = 0, i, j;
   bool **puttablePos;
   puttablePos = malloc(sizeof(bool *) * o->n);
   for (i = 0; i < o->n; i++) {
@@ -179,15 +153,19 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
 
   for (ix = 0; ix < o->n; ix++) {
     for (iy = 0; iy < o->n; iy++) {
-      for (i = 0; i < 8; i++) {
-        if (o->board[ix][iy] == -1) {
-          int endX = -1, endY = -1;
-          if (checkPos(color, i, ix, iy, &endX, &endY, o, 0)) {
-            hasUserPutPlace = true;
-            puttablePos[ix][iy] = true;
+      for (i = -1; i <= 1; i++) {
+        for (j = -1; j <= 1; j++) {
+          if (i == 0 && j == 0) continue;
+          if (o->board[ix][iy] == -1) {
+            int endX = -1, endY = -1;
+            int vector[2] = {i, j};
+            if (checkPos(color, ix, iy, &endX, &endY, vector, o, 0)) {
+              hasUserPutPlace = true;
+              puttablePos[ix][iy] = true;
+            }
+            if (checkPos(!color, ix, iy, &endX, &endY, vector, o, 0))
+              hasEnemyPutPlace = true;
           }
-          if (checkPos(!color, i, ix, iy, &endX, &endY, o, 0))
-            hasEnemyPutPlace = true;
         }
       }
     }
@@ -226,8 +204,7 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
       return;
     }
     /* 配列番号が0番から始まるため． */
-    x--;
-    y--;
+    x--, y--;
 
     if (x < 0 || y < 0 || x >= o->n || y >= o->n) {
       printf("It is not valid input.\nPlease input again.\n");
@@ -241,11 +218,15 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
     }
 
     bool IsPuttable = false;
-    for (i = 0; i < 8; i++) {
-      int endX = -1, endY = -1;
-      if (checkPos(color, i, x, y, &endX, &endY, o, 0)) {
-        paintStone(color, x, y, endX, endY, o->board);
-        IsPuttable = true;
+    for (i = -1; i <= 1; i++) {
+      for (j = -1; j <= 1; j++) {
+        if (i == 0 && j == 0) continue;
+        int endX = -1, endY = -1;
+        int vector[2] = {i, j};
+        if (checkPos(color, x, y, &endX, &endY, vector, o, 0)) {
+          paintStone(color, x, y, endX, endY, o->board);
+          IsPuttable = true;
+        }
       }
     }
     if (IsPuttable) {
