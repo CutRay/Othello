@@ -19,6 +19,7 @@ struct othello {
   int player_color;
   int score[2];
   int pass_flag[2];
+  int is_clear;
   int **board;
   int ***board_log;
 };

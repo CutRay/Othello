@@ -35,22 +35,17 @@ board[0][4] = WHITE とすれば良い．
 
 void saveBoard(int pos, struct othello *o) {
   int ix, iy;
-  for (ix = 0; ix < o->n; ix++) {
-    for (iy = 0; iy < o->n; iy++) {
-      o->board_log[pos][ix][iy] = o->board[ix][iy];
-    }
-  }
+  for (ix = 0; ix < o->n; ix++)
+    for (iy = 0; iy < o->n; iy++) o->board_log[pos][ix][iy] = o->board[ix][iy];
 }
 
 void restoreBoard(int pos, struct othello *o) {
   int ix, iy;
   pos = pos < 0 ? 0 : pos;
-  for (ix = 0; ix < o->n; ix++) {
-    for (iy = 0; iy < o->n; iy++) {
-      o->board[ix][iy] = o->board_log[pos][ix][iy];
-    }
-  }
+  for (ix = 0; ix < o->n; ix++)
+    for (iy = 0; iy < o->n; iy++) o->board[ix][iy] = o->board_log[pos][ix][iy];
 }
+
 void countStone(struct othello *o) {
   int ix = 0, iy = 0;
   int black = 0, white = 0;
@@ -60,32 +55,36 @@ void countStone(struct othello *o) {
       if (o->board[ix][iy] == BLACK) black += 1;
     }
   }
-  o->score[0] = black;
-  o->score[1] = white;
+  o->score[0] = black, o->score[1] = white;
 }
 
-void paintStone(int color, int startX, int startY, int endX, int endY,
-                int **board) {
-  if (startX == endX && startY == endY) return;
-  int dx = endX - startX == 0 ? 0 : (endX - startX) / abs(endX - startX);
-  int dy = endY - startY == 0 ? 0 : (endY - startY) / abs(endY - startY);
-  board[startX + dx][startY + dy] = color;
-  paintStone(color, startX + dx, startY + dy, endX, endY, board);
+void paintStone(int color, int startPos[2], int endPos[2], int **board) {
+  if (startPos[0] == endPos[0] && startPos[1] == endPos[1]) return;
+  int dx = endPos[0] - startPos[0] == 0
+               ? 0
+               : (endPos[0] - startPos[0]) / abs(endPos[0] - startPos[0]);
+  int dy = endPos[1] - startPos[1] == 0
+               ? 0
+               : (endPos[1] - startPos[1]) / abs(endPos[1] - startPos[1]);
+  board[startPos[0] + dx][startPos[1] + dy] = color;
+  int nextStartPos[2] = {startPos[0] + dx, startPos[1] + dy};
+  paintStone(color, nextStartPos, endPos, board);
 }
 
-bool checkPos(int color, int startX, int startY, int *endX, int *endY,
-              int vector[2], struct othello *o, int count) {
-  int x = startX + vector[0];
-  int y = startY + vector[1];
+bool checkPos(int color, int startPos[2], int endPos[2], int vector[2],
+              struct othello *o, int count) {
+  int x = startPos[0] + vector[0];
+  int y = startPos[1] + vector[1];
   if (x < 0 || y < 0 || x >= o->n || y >= o->n) return false;
   if (o->board[x][y] == -1) return false;
   if (o->board[x][y] == !color) {
-    if (!checkPos(color, x, y, endX, endY, vector, o, count + 1)) return false;
+    int nextStartPos[2] = {x, y};
+    if (!checkPos(color, nextStartPos, endPos, vector, o, count + 1))
+      return false;
   }
   if (o->board[x][y] == color) {
     if (count == 0) return false;
-    *endX = x;
-    *endY = y;
+    endPos[0] = x, endPos[1] = y;
   }
   return true;
 }
@@ -104,15 +103,15 @@ void algo_4619023(int color, bool **puttablePos, struct othello *o) {
     for (iy = 0; iy < o->n; iy++) {
       if (puttablePos[ix][iy]) {
         if (posCount == count) {
-          int i;
+          int i, j;
           for (i = -1; i <= 1; i++) {
-            int j;
             for (j = -1; j <= 1; j++) {
               if (i == 0 && j == 0) continue;
-              int endX = -1, endY = -1;
-              int vector[2] = {i, j};
-              if (checkPos(color, ix, iy, &endX, &endY, vector, o, 0)) {
-                paintStone(color, ix, iy, endX, endY, o->board);
+              int startPos[2] = {ix, iy}, vector[2] = {i, j};
+              int endPos[2] = {-1, -1};
+              if (checkPos(color, startPos, endPos, vector, o, 0)) {
+                int startPos[2] = {ix, iy};
+                paintStone(color, startPos, endPos, o->board);
               }
             }
             o->board[ix][iy] = color;
@@ -157,13 +156,13 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
         for (j = -1; j <= 1; j++) {
           if (i == 0 && j == 0) continue;
           if (o->board[ix][iy] == -1) {
-            int endX = -1, endY = -1;
-            int vector[2] = {i, j};
-            if (checkPos(color, ix, iy, &endX, &endY, vector, o, 0)) {
+            int startPos[2] = {ix, iy}, vector[2] = {i, j};
+            int endPos[2] = {-1, -1};
+            if (checkPos(color, startPos, endPos, vector, o, 0)) {
               hasUserPutPlace = true;
               puttablePos[ix][iy] = true;
             }
-            if (checkPos(!color, ix, iy, &endX, &endY, vector, o, 0))
+            if (checkPos(!color, startPos, endPos, vector, o, 0))
               hasEnemyPutPlace = true;
           }
         }
@@ -177,6 +176,7 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
     if (o->score[1] > o->score[0]) printf("Winner is White!!\n");
     if (o->score[1] == o->score[0]) printf("Draw!!\n");
     if (o->score[1] < o->score[0]) printf("Winner is Black!!\n");
+    o->is_clear = true;
     return;
   }
   if (!hasUserPutPlace) {
@@ -185,6 +185,7 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
   }
 
   if (color == !o->player_color) {
+    usleep(0.3 * 1000000);
     algo_4619023(color, puttablePos, o);
     for (i = 0; i < o->n; i++) {
       free(puttablePos[i]);
@@ -221,10 +222,11 @@ void myothello(int *step, /* 現在のステップ数(初期値は0) */
     for (i = -1; i <= 1; i++) {
       for (j = -1; j <= 1; j++) {
         if (i == 0 && j == 0) continue;
-        int endX = -1, endY = -1;
-        int vector[2] = {i, j};
-        if (checkPos(color, x, y, &endX, &endY, vector, o, 0)) {
-          paintStone(color, x, y, endX, endY, o->board);
+        int startPos[2] = {x, y}, vector[2] = {i, j};
+        int endPos[2] = {-1, -1};
+        if (checkPos(color, startPos, endPos, vector, o, 0)) {
+          int startPos[2] = {x, y};
+          paintStone(color, startPos, endPos, o->board);
           IsPuttable = true;
         }
       }
@@ -268,8 +270,8 @@ int main(int argc, char **argv) {
   int playerColor = rand() % 2;
   if (playerColor == BLACK) printf("You are black.\n");
   if (playerColor == WHITE) printf("You are white.\n");
-  struct othello othello_instance = {n,      playerColor, {2, 2},
-                                     {0, 0}, NULL,        NULL},
+  struct othello othello_instance = {n, playerColor, {2, 2}, {0, 0},
+                                     0, NULL,        NULL},
                  *o = &othello_instance; /* 8はボードの列(行)数．*/
 
   /* ボード作成(2次元配列の確保) */

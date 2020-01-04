@@ -77,10 +77,12 @@ void view_loop(struct view *v, struct othello *o) {
   saveBoard(step, o);
   view_draw(v, o);
   while (!0) {
-    usleep(10 * 100);
-    myothello(&step, o);
-    step++;
-    view_draw(v, o);
+    if (!o->is_clear) {
+      usleep(10 * 100);
+      myothello(&step, o);
+      step++;
+      view_draw(v, o);
+    }
   }
 }
 
